@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System.Data.SqlClient;
+using Azure_week3.Models;
 
 namespace MCT.Functions
 {
@@ -18,13 +19,54 @@ namespace MCT.Functions
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/registrations")] HttpRequest req,
             ILogger log)
         {
-            log.LogInformation("Trying to add registration");
-            // this is the body of the request
-            string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            //convert to json
-            dynamic data = JsonConvert.DeserializeObject(requestBody);
-            return new OkObjectResult(data);
-        }
+            try
+            {
+                // get json and convert to readable string
+                string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+                dynamic registration = JsonConvert.DeserializeObject(requestBody);
 
+                //generate Guid id
+                Guid RegistrationId = Guid.NewGuid();
+
+                //new user
+                azure_model user = new azure_model
+                {
+                    RegistrationId = RegistrationId,
+                    LastName = registration.LastName,
+                    FirstName = registration.FirstName,
+                    Email = registration.Email,
+                    Zipcode = registration.Zipcode,
+                    Age = registration.Age,
+                    IsFirstTimer = registration.IsFirstTimer
+                };
+
+
+                var connectionString = Environment.GetEnvironmentVariable("ConnectionString");
+
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    await connection.OpenAsync();
+                    using (SqlCommand command = new SqlCommand())
+                    {
+                        command.Connection = connection;
+                        command.CommandText = "INSERT INTO registrations (RegisrtationId, LastName, FirstName, Email, Zipcode, Age, IsFirstTimer) VALUES (@RegistrationId, @LastName, @FirstName, @Email, @Zipcode, @Age, @IsFirstTimer)";
+                        command.Parameters.AddWithValue("@RegistrationId", RegistrationId);
+                        command.Parameters.AddWithValue("@LastName", user.LastName);
+                        command.Parameters.AddWithValue("@FirstName", user.FirstName);
+                        command.Parameters.AddWithValue("@Email", user.Email);
+                        command.Parameters.AddWithValue("@Zipcode", user.Zipcode);
+                        command.Parameters.AddWithValue("@Age", user.Age);
+                        command.Parameters.AddWithValue("@IsFirstTimer", user.IsFirstTimer);
+                        await command.ExecuteNonQueryAsync();
+                    }
+                }
+                return new OkObjectResult("registration added");
+            }
+            catch (System.Exception ex)
+            {
+
+                return new BadRequestObjectResult($"something went wrong {ex}");
+            }
+        }
     }
 }
