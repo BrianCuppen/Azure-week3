@@ -27,7 +27,7 @@ namespace MCT.Functions
 
                 using (SqlConnection connection = new SqlConnection(connectionString))
                 {
-                    connection.Open();
+                    await connection.OpenAsync();
                     string sql = "SELECT * FROM Registrations";
                     using (SqlCommand command = new SqlCommand(sql, connection))
                     {
